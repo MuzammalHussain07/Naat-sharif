@@ -3,17 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Naat Sharif Clickable Viewer</title>
+<title>Naat Sharif PDF Viewer</title>
 <style>
     body {
         font-family: Arial, sans-serif;
         background: linear-gradient(to bottom, #fce4ec, #e1f5fe);
         margin: 0;
         padding: 20px;
+        text-align: center;
     }
     h1 {
-        text-align: center;
         color: #d32f2f;
+        margin-bottom: 20px;
+    }
+    #searchBox {
+        width: 90%;
+        max-width: 400px;
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
         margin-bottom: 20px;
     }
     #sentenceList {
@@ -22,6 +31,7 @@
         align-items: center;
         max-width: 600px;
         margin: 0 auto;
+        text-align: center;
     }
     .sentenceItem {
         width: 100%;
@@ -32,56 +42,108 @@
         cursor: pointer;
         font-size: 16px;
         transition: 0.3s;
-        text-align: center;
     }
     .sentenceItem:hover {
         background: #ffab91;
         transform: scale(1.02);
     }
-    iframe {
-        margin-top: 25px;
-        width: 100%;
-        height: 80vh;
-        border: none;
-        border-radius: 12px;
+    .active {
+        background: #ff7043 !important;
+        color: white;
+        font-weight: bold;
+    }
+    #pdfCanvas {
+        display: block;
+        margin: 25px auto;
+        border: 1px solid #ccc;
         box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-        transition: 0.5s;
+        border-radius: 10px;
+        max-width: 100%;
+        transition: opacity 0.5s ease-in-out;
     }
 </style>
 </head>
 <body>
 
-<h1>Naat Sharif Clickable Viewer</h1>
+<h1>Naat Sharif PDF Viewer</h1>
 
-<div id="sentenceList">
-    <!-- Sentences will be generated here -->
-</div>
+<input type="text" id="searchBox" placeholder="Search Naat..." onkeyup="filterSentences()">
 
-<iframe id="pdfViewer" src="https://drive.google.com/file/d/1cZhyQQKYtVjZAIhD_AEqvV9HAU2Lzykm/preview" allowfullscreen></iframe>
+<div id="sentenceList"></div>
 
+<canvas id="pdfCanvas"></canvas>
+
+<!-- PDF.js library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.110/pdf.min.js"></script>
 <script>
-// Step 1: Provide your sentences and their page numbers
+// Step 1: Google Drive direct download link
+const pdfUrl = 'https://drive.google.com/uc?export=download&id=1cZhyQQKYtVjZAIhD_AEqvV9HAU2Lzykm';
+
+// Step 2: List of sentences with page numbers
 const naatList = [
-    { sentence: "سلام", page: 10 },
+    { sentence: "سلام", page: 1 },
     { sentence: "Mera Dil Badal De", page: 3 },
     { sentence: "Ya Nabi Salam Alayka", page: 5 },
     { sentence: "Another Naat Example", page: 7 }
 ];
 
-// Step 2: Generate clickable list
+// Step 3: Generate clickable list
 const listContainer = document.getElementById('sentenceList');
+let sentenceDivs = [];
+
 naatList.forEach(item => {
     const div = document.createElement('div');
     div.className = 'sentenceItem';
     div.innerText = item.sentence;
-    div.onclick = () => goToPage(item.page);
+    div.onclick = () => renderPage(item.page, div);
     listContainer.appendChild(div);
+    sentenceDivs.push({ div, sentence: item.sentence.toLowerCase() });
 });
 
-// Step 3: Function to jump to the page
-function goToPage(page) {
-    const iframe = document.getElementById('pdfViewer');
-    iframe.src = `https://drive.google.com/file/d/1cZhyQQKYtVjZAIhD_AEqvV9HAU2Lzykm/preview?page=${page}`;
+// Step 4: PDF.js setup
+let pdfDoc = null;
+const canvas = document.getElementById('pdfCanvas');
+const ctx = canvas.getContext('2d');
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.10.110/pdf.worker.min.js';
+
+pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
+    pdfDoc = pdf;
+    renderPage(1); // show first page initially
+}).catch(err => console.error(err));
+
+// Step 5: Render a page
+let currentActive = null;
+function renderPage(pageNumber, clickedDiv = null) {
+    if(clickedDiv) {
+        if(currentActive) currentActive.classList.remove('active');
+        clickedDiv.classList.add('active');
+        currentActive = clickedDiv;
+    }
+    pdfDoc.getPage(pageNumber).then(page => {
+        const viewport = page.getViewport({ scale: 1.5 });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        // Smooth fade effect
+        canvas.style.opacity = 0;
+        const renderContext = { canvasContext: ctx, viewport: viewport };
+        page.render(renderContext).promise.then(() => {
+            canvas.style.opacity = 1;
+        });
+    });
+}
+
+// Step 6: Search functionality
+function filterSentences() {
+    const query = document.getElementById('searchBox').value.toLowerCase();
+    sentenceDivs.forEach(item => {
+        if(item.sentence.includes(query)) {
+            item.div.style.display = 'block';
+        } else {
+            item.div.style.display = 'none';
+        }
+    });
 }
 </script>
 
